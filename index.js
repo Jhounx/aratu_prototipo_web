@@ -1,7 +1,9 @@
 const express = require("express")
 const mustacheExpress = require('mustache-express');
+const mustache = require("mustache")
 const session = require('express-session')
 const bodyParser = require("body-parser")
+const fs = require("fs")
 
 const app = express()
 
@@ -21,12 +23,37 @@ app.engine('html', mustacheExpress());
 app.set('view engine', 'html');
 app.set('views', `${__dirname}/views`);
 
-const flag = process.env["FLAG"]
+const flag = process.env["FLAG"] || "potato"
+
+const restartServer = () => { 
+    setTimeout(function () {
+        process.on("exit", function () {
+          require("child_process")
+            .spawn(
+              process.argv.shift(),
+              process.argv,
+              {
+                cwd: process.cwd(),
+                detached: true,
+                stdio: "inherit"
+              }
+            );
+        });
+        process.exit();
+    }, 1000);
+}
 
 app.get('/admin', (req, res) => {
     if (req.session.user){
         const name = users[req.session.user]
-        return res.render('admin', {is_admin: req.session.type === "admin", flag});
+        const admin_file = fs.readFileSync("./views/admin.html", {encoding:'utf8', flag:'r'})
+
+        let rend = mustache.render(admin_file, {is_admin: req.session.type === "admin", flag});
+        res.status(200).send(rend)
+        if (rend.includes(flag)) {
+            restartServer()
+        }
+        return
     }
     res.redirect("/regist")
 });
